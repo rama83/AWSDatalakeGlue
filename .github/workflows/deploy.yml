@@ -1,0 +1,70 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - test
+          - staging
+          - prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run unit tests
+      run: |
+        pip install pytest
+        pytest tests/unit/
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    
+    - name: Create deployment package
+      run: |
+        mkdir -p dist
+        zip -r dist/datalake_package.zip src config -x "*.pyc" "__pycache__/*"
+    
+    - name: Deploy to AWS
+      run: |
+        # Determine environment
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+        else
+          ENVIRONMENT="dev"
+        fi
+        
+        # Upload package to S3
+        aws s3 cp dist/datalake_package.zip "s3://${ENVIRONMENT}-datalake-deployment/datalake_package.zip"
+        
+        # Upload scripts to S3
+        aws s3 cp src/pipelines/ingest_to_bronze.py "s3://${ENVIRONMENT}-datalake-deployment/scripts/ingest_to_bronze.py"
+        aws s3 cp src/pipelines/bronze_to_silver.py "s3://${ENVIRONMENT}-datalake-deployment/scripts/bronze_to_silver.py"
+        aws s3 cp src/pipelines/python_shell_example.py "s3://${ENVIRONMENT}-datalake-deployment/scripts/python_shell_example.py"
+        
+        echo "Deployment to ${ENVIRONMENT} completed successfully!"

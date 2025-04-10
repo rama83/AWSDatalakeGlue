@@ -1,0 +1,24 @@
+# AWS and Glue dependencies
+boto3>=1.26.0
+awswrangler>=3.0.0
+aws-glue-libs>=5.0.0
+
+# Data processing
+pandas>=1.5.0
+pyarrow>=12.0.0
+pyspark>=3.3.0
+
+# Configuration and utilities
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Testing
+pytest>=7.3.1
+pytest-cov>=4.1.0
+moto>=4.1.0
+
+# Development
+black>=23.3.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.3.0

@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  glue:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile
+    container_name: aws-glue-datalake
+    volumes:
+      - ../../:/home/glue_user/workspace
+      - ~/.aws:/home/glue_user/.aws:ro
+    environment:
+      - AWS_PROFILE=${AWS_PROFILE:-default}
+      - PYTHONPATH=/home/glue_user/workspace
+      - DATALAKE_ENVIRONMENT=development
+    ports:
+      - "4040:4040"  # Spark UI
+      - "8888:8888"  # Jupyter
+    command: tail -f /dev/null  # Keep container running
