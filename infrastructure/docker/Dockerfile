@@ -15,13 +15,21 @@ RUN pip install --no-cache-dir \
     flake8 \
     mypy \
     python-dotenv \
-    awswrangler
+    awswrangler \
+    boto3 \
+    jupyter \
+    jupyterlab
 
 # Create workspace directory
 WORKDIR /home/glue_user/workspace
 
-# Copy project files
-COPY . .
+# Add Jupyter configuration
+RUN mkdir -p /home/glue_user/.jupyter
+COPY infrastructure/docker/jupyter_notebook_config.py /home/glue_user/.jupyter/
+
+# Add entrypoint script
+COPY infrastructure/docker/entrypoint.sh /home/glue_user/
+RUN chmod +x /home/glue_user/entrypoint.sh
 
 # Set up entrypoint
-ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["/home/glue_user/entrypoint.sh"]

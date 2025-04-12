@@ -45,16 +45,37 @@ The framework uses AWS Glue 5.0 for ETL processing, with support for both Spark 
 
    This script will:
    - Create data directories for input and output
-   - Build and start the Docker container with AWS Glue 5.0
+   - Build and start the Docker containers (AWS Glue 5.0 and MinIO for S3 emulation)
+   - Configure AWS CLI to use MinIO for local development
 
 3. Verify the setup:
    ```
    docker ps
    ```
 
-   You should see the `aws-glue-datalake` container running.
+   You should see the following containers running:
+   - `aws-glue-datalake`: AWS Glue 5.0 development environment
+   - `minio`: MinIO S3-compatible storage
+
+4. Access the services:
+   - Jupyter Lab: http://localhost:8888/?token=glue
+   - Spark UI: http://localhost:4040
+   - Spark History Server: http://localhost:18080
+   - MinIO Console: http://localhost:9001 (login with minioadmin/minioadmin)
+
+5. Create a sample notebook (optional):
+   ```
+   chmod +x scripts/create_sample_notebook.sh
+   ./scripts/create_sample_notebook.sh
+   ```
+
+   This will create a sample Jupyter notebook with examples of using AWS Glue with the local environment.
 
 ## Running Jobs Locally
+
+The framework provides multiple ways to run and develop Glue jobs locally:
+
+### Using the Run Script
 
 The framework includes a script to run Glue jobs locally:
 
@@ -63,7 +84,7 @@ chmod +x scripts/run_local_job.sh
 ./scripts/run_local_job.sh <job_name> [job_args]
 ```
 
-### Examples
+#### Examples
 
 1. Run the Python shell example job:
    ```
@@ -79,6 +100,24 @@ chmod +x scripts/run_local_job.sh
    ```
    ./scripts/run_local_job.sh bronze_to_silver --JOB_NAME=bronze_to_silver --source_path=s3://test-bronze-bucket/data/2023/01/01/123456/sample.csv --table_name=test_table --transformations_json='[{"type":"rename_columns","params":{"column_map":{"name":"full_name"}}}]' --partition_keys=year=2023,month=01 --validate_schema=true
    ```
+
+### Using Jupyter Lab
+
+For interactive development and testing, you can use Jupyter Lab:
+
+```
+chmod +x scripts/start_jupyter.sh
+./scripts/start_jupyter.sh
+```
+
+This will open Jupyter Lab in your browser, where you can:
+
+1. Open the sample notebook at `notebooks/glue_sample.ipynb`
+2. Create new notebooks for development
+3. Interactively test your data processing code
+4. Visualize your data
+
+Jupyter Lab provides a more interactive experience for developing and debugging Glue jobs before running them in production.
 
 ## Testing
 
@@ -301,7 +340,7 @@ To add a new transformation type:
        # Implement the new transformation
        column = params.get("column")
        factor = params.get("factor", 1)
-       
+
        if column in result_df.columns:
            result_df[column] = result_df[column] * factor
    ```
@@ -336,12 +375,12 @@ To create a new Glue job:
    from awsglue.job import Job
    from awsglue.utils import getResolvedOptions
    from pyspark.context import SparkContext
-   
+
    from src.utils.logging_utils import get_glue_logger
-   
+
    # Initialize logger
    logger = get_glue_logger("my_new_job")
-   
+
    def process_args():
        """Process job arguments."""
        args = getResolvedOptions(
@@ -351,37 +390,37 @@ To create a new Glue job:
                # Add your job parameters here
            ],
        )
-       
+
        return args
-   
+
    def run_job():
        """Run the Glue job."""
        # Get job arguments
        args = process_args()
        logger.info(f"Starting job with arguments: {args}")
-       
+
        # Initialize Spark context
        sc = SparkContext()
        glueContext = GlueContext(sc)
        spark = glueContext.spark_session
        job = Job(glueContext)
        job.init(args["JOB_NAME"])
-       
+
        try:
            # Implement your job logic here
-           
+
            # Commit the job
            job.commit()
-           
+
            return {
                "status": "success",
                # Add your job results here
            }
-       
+
        except Exception as e:
            logger.error(f"Error in job execution: {str(e)}")
            raise
-   
+
    if __name__ == "__main__":
        run_job()
    ```
@@ -391,19 +430,19 @@ To create a new Glue job:
    import argparse
    import sys
    import os
-   
+
    # Add the project root to the Python path
    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-   
+
    from src.utils.logging_utils import setup_logger
-   
+
    # Initialize logger
    logger = setup_logger("my_new_job")
-   
+
    def parse_args():
        """Parse command line arguments."""
        parser = argparse.ArgumentParser(description="My new job")
-       
+
        # Add your job parameters here
        parser.add_argument(
            "--param1",
@@ -411,27 +450,27 @@ To create a new Glue job:
            required=True,
            help="Description of param1"
        )
-       
+
        return parser.parse_args()
-   
+
    def run_job():
        """Run the job."""
        # Parse arguments
        args = parse_args()
        logger.info(f"Starting job with arguments: {args}")
-       
+
        try:
            # Implement your job logic here
-           
+
            return {
                "status": "success",
                # Add your job results here
            }
-       
+
        except Exception as e:
            logger.error(f"Error in job execution: {str(e)}")
            raise
-   
+
    if __name__ == "__main__":
        run_job()
    ```

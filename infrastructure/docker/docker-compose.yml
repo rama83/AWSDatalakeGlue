@@ -9,11 +9,57 @@ services:
     volumes:
       - ../../:/home/glue_user/workspace
       - ~/.aws:/home/glue_user/.aws:ro
+      - glue_spark_history:/home/glue_user/spark/spark-events
     environment:
       - AWS_PROFILE=${AWS_PROFILE:-default}
       - PYTHONPATH=/home/glue_user/workspace
       - DATALAKE_ENVIRONMENT=development
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=glue
+      - GLUE_SPARK_CONF=spark.driver.memory=5g spark.executor.memory=5g
     ports:
       - "4040:4040"  # Spark UI
+      - "18080:18080"  # Spark History Server
       - "8888:8888"  # Jupyter
-    command: tail -f /dev/null  # Keep container running
+      - "8998:8998"  # Livy
+    # Use the entrypoint script to start services
+    # The container will keep running with the services started
+
+  # Add MinIO service for local S3 emulation
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Add MinIO client for bucket setup
+  mc:
+    image: minio/mc
+    container_name: mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5 &&
+      /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin &&
+      /usr/bin/mc mb myminio/test-bronze-bucket --ignore-existing &&
+      /usr/bin/mc mb myminio/test-silver-bucket --ignore-existing &&
+      /usr/bin/mc mb myminio/test-deployment-bucket --ignore-existing &&
+      exit 0;
+      "
+
+volumes:
+  glue_spark_history:
+  minio_data:
